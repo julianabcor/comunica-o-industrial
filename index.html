@@ -2,49 +2,77 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>WEG | Smart Control</title>
+    <title>WEG | Dashboard de Alarmes</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { --weg-blue: #005596; }
-        body { background: #f4f7f6; font-family: sans-serif; }
+        :root { --weg-blue: #005596; --danger: #dc3545; }
+        body { background: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
         .navbar { background: var(--weg-blue); color: white; }
-        .card-sensor { border: none; border-radius: 12px; transition: 0.3s; }
-        .alert-mode { border: 2px solid #e74c3c !important; background: #fff5f5; }
-        .btn-control { width: 100%; padding: 15px; font-weight: bold; border-radius: 10px; }
+        
+        /* Estilo base dos cards */
+        .card-sensor { 
+            border: none; 
+            border-radius: 15px; 
+            background: white; 
+            transition: all 0.4s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        /* Classe de Alerta (fica vermelho e pulsa) */
+        .status-danger { 
+            background-color: var(--danger) !important; 
+            color: white !important;
+            animation: pulse-red 2s infinite;
+        }
+        .status-danger h1, .status-danger p, .status-danger .sensor-label { color: white !important; }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0px rgba(220, 53, 69, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0px rgba(220, 53, 69, 0); }
+        }
+
+        .sensor-label { color: #6c757d; font-weight: bold; text-transform: uppercase; font-size: 0.75rem; }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark p-3">
-    <div class="container"><span>WEG INDUSTRIAL IOT - EQUIPE 4</span></div>
+<nav class="navbar p-3 shadow-sm">
+    <div class="container d-flex justify-content-between">
+        <span class="navbar-brand mb-0 h1"><i class="fas fa-microchip me-2"></i> MONITORAMENTO CRÍTICO WEG</span>
+        <span class="badge bg-light text-dark" id="mqtt-status">CONECTANDO...</span>
+    </div>
 </nav>
 
-<div class="container mt-4">
-    <div class="row g-4">
+<div class="container mt-5">
+    <div class="row g-4 text-center">
         <div class="col-md-4">
-            <div class="card card-sensor p-3 shadow-sm" id="card-temp">
-                <h6>Temperatura</h6>
-                <h2 id="val-temp">--</h2>
-                <canvas id="chartTemp" height="100"></canvas>
+            <div class="card card-sensor p-4" id="card-temp">
+                <span class="sensor-label">Temperatura</span>
+                <h1 id="val-temp" class="display-4 fw-bold">--</h1>
+                <p class="m-0">Limite: 30°C</p>
+                <div class="mt-3"><canvas id="chartTemp" height="80"></canvas></div>
             </div>
         </div>
 
         <div class="col-md-4">
-            <div class="card card-sensor p-3 shadow-sm">
-                <h6>Umidade</h6>
-                <h2 id="val-umid">--</h2>
-                <p class="text-muted">Status: Operacional</p>
+            <div class="card card-sensor p-4" id="card-umid">
+                <span class="sensor-label">Umidade</span>
+                <h1 id="val-umid" class="display-4 fw-bold">--</h1>
+                <p class="m-0">Limite: 60%</p>
+                <div class="mt-4"><i class="fas fa-droplet fa-3x opacity-25"></i></div>
             </div>
         </div>
 
         <div class="col-md-4">
-            <div class="card card-sensor p-3 shadow-sm">
-                <h6>Comando Remoto</h6>
-                <p>Simulação de Atuador (Motor/Ventoinha)</p>
-                <button class="btn btn-primary btn-control" onclick="enviarComando('ON')">LIGAR MOTOR</button>
-                <button class="btn btn-outline-danger btn-control mt-2" onclick="enviarComando('OFF')">DESLIGAR</button>
+            <div class="card card-sensor p-4" id="card-pres">
+                <span class="sensor-label">Pressão</span>
+                <h1 id="val-pres" class="display-4 fw-bold">--</h1>
+                <p class="m-0">Mínimo: 1012 hPa</p>
+                <div class="mt-4"><i class="fas fa-gauge-high fa-3x opacity-25"></i></div>
             </div>
         </div>
     </div>
@@ -53,37 +81,43 @@
 <script>
     const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
     
-    // Configuração do Gráfico
+    // Configurações do Gráfico
     const ctx = document.getElementById('chartTemp').getContext('2d');
     const chart = new Chart(ctx, {
         type: 'line',
-        data: { labels: [], datasets: [{ label: 'Temp', data: [], borderColor: '#005596' }] },
-        options: { scales: { x: { display: false } } }
+        data: { labels: [], datasets: [{ data: [], borderColor: '#005596', tension: 0.4, fill: true, backgroundColor: 'rgba(0, 85, 150, 0.1)' }] },
+        options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
     });
 
-    client.on('connect', () => { client.subscribe('centro_weg/projeto/equipe4'); });
+    client.on('connect', () => {
+        document.getElementById('mqtt-status').innerText = "ONLINE";
+        client.subscribe('centro_weg/projeto/equipe4');
+    });
 
     client.on('message', (topic, message) => {
         const data = JSON.parse(message.toString());
-        document.getElementById('val-temp').innerText = data.temp.toFixed(1) + "°C";
+        
+        // 1. Atualizar Temperatura e Alerta
+        document.getElementById('val-temp').innerText = data.temp.toFixed(1) + "°";
+        if(data.temp > 30) document.getElementById('card-temp').classList.add('status-danger');
+        else document.getElementById('card-temp').classList.remove('status-danger');
+
+        // 2. Atualizar Umidade e Alerta
         document.getElementById('val-umid').innerText = data.umid.toFixed(1) + "%";
+        if(data.umid > 60) document.getElementById('card-umid').classList.add('status-danger');
+        else document.getElementById('card-umid').classList.remove('status-danger');
 
-        // Alerta Visual se temp > 30
-        if(data.temp > 30) document.getElementById('card-temp').classList.add('alert-mode');
-        else document.getElementById('card-temp').classList.remove('alert-mode');
+        // 3. Atualizar Pressão e Alerta (Mínimo crítico)
+        document.getElementById('val-pres').innerText = data.pres.toFixed(0);
+        if(data.pres < 1012) document.getElementById('card-pres').classList.add('status-danger');
+        else document.getElementById('card-pres').classList.remove('status-danger');
 
-        // Atualiza Gráfico
+        // Atualizar Gráfico
         chart.data.labels.push("");
         chart.data.datasets[0].data.push(data.temp);
-        if(chart.data.labels.length > 10) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+        if(chart.data.labels.length > 15) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
         chart.update();
     });
-
-    // Função de Bidirecionalidade (Controle)
-    function enviarComando(cmd) {
-        client.publish('centro_weg/projeto/comando', cmd);
-        alert("Comando " + cmd + " enviado para a fábrica!");
-    }
 </script>
 </body>
 </html>
