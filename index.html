@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Industrial - Equipe 4</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 50px; }
+        .card { background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; width: 300px; }
+        h1 { color: #005596; font-size: 1.2rem; }
+        .temp-display { font-size: 3rem; font-weight: bold; color: #e74c3c; margin: 20px 0; }
+        .status { font-size: 0.8rem; color: #7f8c8d; }
+        .led { height: 10px; width: 10px; background: #2ecc71; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>MONITORAMENTO WEG</h1>
+    <div class="status"><span class="led"></span> Conectado ao Broker</div>
+    <div class="temp-display" id="temperatura">--°C</div>
+    <p>Sensor: <span id="sensor-id">Aguardando...</span></p>
+    <small id="timestamp"></small>
+</div>
+
+<script>
+    // Configurações do Broker (Mesmas do Wokwi e HiveMQ)
+    const broker = 'wss://broker.hivemq.com:8884/mqtt';
+    const topic = 'centro_weg/projeto/equipe4';
+    const client = mqtt.connect(broker);
+
+    client.on('connect', () => {
+        console.log('Conectado ao MQTT via WebSockets!');
+        client.subscribe(topic);
+    });
+
+    client.on('message', (topic, message) => {
+        // Transforma o texto recebido em Objeto JavaScript
+        const data = JSON.parse(message.toString());
+        
+        // Atualiza os elementos do HTML
+        document.getElementById('temperatura').innerText = data.temp.toFixed(1) + '°C';
+        document.getElementById('sensor-id').innerText = data.sensor;
+        document.getElementById('timestamp').innerText = 'Última atualização: ' + new Date().toLocaleTimeString();
+    });
+</script>
+
+</body>
+</html>
