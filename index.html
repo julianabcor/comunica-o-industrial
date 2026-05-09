@@ -2,46 +2,79 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard Industrial - Equipe 4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Industrial | Equipe 4</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 50px; }
-        .card { background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; width: 300px; }
-        h1 { color: #005596; font-size: 1.2rem; }
-        .temp-display { font-size: 3rem; font-weight: bold; color: #e74c3c; margin: 20px 0; }
-        .status { font-size: 0.8rem; color: #7f8c8d; }
-        .led { height: 10px; width: 10px; background: #2ecc71; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
+        .navbar { background-color: #005596; color: white; margin-bottom: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .card-sensor { border: none; border-radius: 15px; transition: transform 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .card-sensor:hover { transform: translateY(-5px); }
+        .value { font-size: 2.5rem; font-weight: bold; color: #333; }
+        .unit { font-size: 1rem; color: #666; }
+        .status-dot { height: 10px; width: 10px; background-color: #28a745; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .footer-status { font-size: 0.8rem; color: #666; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h1>MONITORAMENTO WEG</h1>
-    <div class="status"><span class="led"></span> Conectado ao Broker</div>
-    <div class="temp-display" id="temperatura">--°C</div>
-    <p>Sensor: <span id="sensor-id">Aguardando...</span></p>
-    <small id="timestamp"></small>
+<nav class="navbar navbar-dark">
+    <div class="container">
+        <span class="navbar-brand mb-0 h1">WEG | Monitoramento Online</span>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card card-sensor p-4">
+                <h5 class="text-muted">Temperatura</h5>
+                <div class="value" id="temp">--</div>
+                <span class="unit">Graus Celsius (°C)</span>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-sensor p-4">
+                <h5 class="text-muted">Umidade</h5>
+                <div class="value" id="umid">--</div>
+                <span class="unit">Umidade Relativa (%)</span>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-sensor p-4">
+                <h5 class="text-muted">Pressão</h5>
+                <div class="value" id="pres">--</div>
+                <span class="unit">Hectopascal (hPa)</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-status text-center">
+        <span class="status-dot"></span> Sistema conectado via MQTT (Broker HiveMQ) <br>
+        <small id="last-update">Aguardando dados...</small>
+    </div>
 </div>
 
 <script>
-    // Configurações do Broker (Mesmas do Wokwi e HiveMQ)
-    const broker = 'wss://broker.hivemq.com:8884/mqtt';
-    const topic = 'centro_weg/projeto/equipe4';
-    const client = mqtt.connect(broker);
-
+    const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+    
     client.on('connect', () => {
-        console.log('Conectado ao MQTT via WebSockets!');
-        client.subscribe(topic);
+        client.subscribe('centro_weg/projeto/equipe4');
     });
 
     client.on('message', (topic, message) => {
-        // Transforma o texto recebido em Objeto JavaScript
         const data = JSON.parse(message.toString());
         
-        // Atualiza os elementos do HTML
-        document.getElementById('temperatura').innerText = data.temp.toFixed(1) + '°C';
-        document.getElementById('sensor-id').innerText = data.sensor;
-        document.getElementById('timestamp').innerText = 'Última atualização: ' + new Date().toLocaleTimeString();
+        // Atualiza os valores na tela
+        document.getElementById('temp').innerText = data.temp.toFixed(1);
+        document.getElementById('umid').innerText = data.umid.toFixed(1);
+        document.getElementById('pres').innerText = data.pres.toFixed(0);
+        
+        // Atualiza o horário
+        document.getElementById('last-update').innerText = 'Última atualização: ' + new Date().toLocaleTimeString();
     });
 </script>
 
